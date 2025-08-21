@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Jocul Cuvintelor - Setup</title>
+    <style>
+        body { font-family: sans-serif; background: #2c3e50; color: #ecf0f1; text-align: center; padding-top: 50px; }
+        h1 { color: #f1c40f; }
+        input { padding: 10px; margin: 5px; font-size: 16px; border-radius: 5px; border: none; }
+        button { padding: 15px 30px; font-size: 20px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Setup Jocul Cuvintelor</h1>
+    <h3>Introduceți numele celor 5 jucători:</h3>
+    <form id="setup-form">
+        <input type="text" id="player1" placeholder="Jucator 1" required><br>
+        <input type="text" id="player2" placeholder="Jucator 2" required><br>
+        <input type="text" id="player3" placeholder="Jucator 3" required><br>
+        <input type="text" id="player4" placeholder="Jucator 4" required><br>
+        <input type="text" id="player5" placeholder="Jucator 5" required><br>
+        <button type="submit">START JOC</button>
+    </form>
+    <p style="margin-top: 20px;">
+        După ce dați start, deschideți ecranul de joc și cel de prezentator în tab-uri noi:<br>
+        <a href="/joc" target="_blank">Ecran Jucător</a> | 
+        <a href="/prezentator" target="_blank">Ecran Prezentator</a>
+    </p>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        document.getElementById('setup-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const players = [];
+            for (let i = 1; i <= 5; i++) {
+                players.push(document.getElementById('player' + i).value);
+            }
+            const socket = io();
+            socket.on('connect', () => {
+                socket.emit('start_game', { players: players });
+                alert('Jocul a fost configurat! Deschideți celelalte ecrane.');
+            });
+        });
+    </script>
+</body>
+</html>

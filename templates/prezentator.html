@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Jocul Cuvintelor - Prezentator</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #222; color: #eee; text-align: center; padding: 2em; }
+        .card { background: #333; padding: 2em; border-radius: 15px; max-width: 800px; margin: auto; }
+        h1 { color: #f39c12; }
+        #jucator_info { font-size: 1.5em; color: #1abc9c; }
+        #definitie { font-size: 1.8em; margin: 1em 0; min-height: 100px;}
+        #cuvant { font-size: 3em; color: #e74c3c; letter-spacing: 0.2em; background: #444; padding: 20px; border-radius: 10px; }
+        .controls { margin-top: 30px; }
+        .controls button { padding: 15px 30px; font-size: 1.2em; border: none; border-radius: 8px; cursor: pointer; margin: 5px; }
+        .controls button:disabled { background-color: #7f8c8d; cursor: not-allowed; }
+        #btn-continua { background-color: #27ae60; color: white; width: 100%; }
+        #btn-corect { background-color: #2ecc71; color: white; }
+        #btn-gresit { background-color: #c0392b; color: white; }
+        #validation-controls { display: none; }
+        #answer-timer-host { font-size: 2em; color: #e67e22; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Ecran Prezentator</h1>
+        <div id="jucator_info">Așteptare start joc...</div>
+        <hr>
+        <div id="definitie">...</div>
+        <div id="cuvant">...</div>
+
+        <div class="controls">
+            <button id="btn-continua" disabled>Continuă</button>
+            <div id="validation-controls">
+                <div id="answer-timer-host"></div>
+                <button id="btn-corect">CORECT</button>
+                <button id="btn-gresit">GREȘIT</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const btnContinua = document.getElementById('btn-continua');
+        const validationControls = document.getElementById('validation-controls');
+        const btnCorect = document.getElementById('btn-corect');
+        const btnGresit = document.getElementById('btn-gresit');
+        const answerTimerHost = document.getElementById('answer-timer-host');
+
+        btnContinua.addEventListener('click', () => socket.emit('next_step'));
+        btnCorect.addEventListener('click', () => socket.emit('host_validation', {status: 'corect'}));
+        btnGresit.addEventListener('click', () => socket.emit('host_validation', {status: 'gresit'}));
+
+        socket.on('update_prezentator', (data) => {
+            document.getElementById('jucator_info').textContent = `Jucător: ${data.jucator_curent} | Scor: ${data.scor} lei`;
+            document.getElementById('definitie').textContent = `Definiție: ${data.definitie}`;
+            document.getElementById('cuvant').textContent = data.cuvant || '...';
+            
+            // Logica de afisare/blocare butoane
+            const butoane = data.stare_butoane.prezentator;
+            btnContinua.disabled = !butoane.continua;
+
+            if(butoane.validare) {
+                validationControls.style.display = 'block';
+                btnContinua.style.display = 'none';
+            } else {
+                validationControls.style.display = 'none';
+                btnContinua.style.display = 'block';
+            }
+        });
+
+        socket.on('update_timer', (data) => {
+            if (data.type === 'answer') {
+                answerTimerHost.textContent = `Timp Răspuns: ${data.time}`;
+            } else {
+                 answerTimerHost.textContent = '';
+            }
+        });
+        
+        socket.on('game_over', () => {
+             document.querySelector('.card').innerHTML = '<h1>Joc Terminat!</h1>';
+        });
+    </script>
+</body>
+</html>

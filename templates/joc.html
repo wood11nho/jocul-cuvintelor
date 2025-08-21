@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Jocul Cuvintelor - Jucător</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #34495e; color: white; text-align: center; }
+        .container { max-width: 900px; margin: auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; font-size: 2em; padding: 10px; background: #2c3e50; border-radius: 10px; }
+        .timer { color: #f1c40f; }
+        .score { color: #2ecc71; }
+        .definition { margin-top: 40px; font-size: 1.5em; min-height: 80px; }
+        .word-display { margin: 40px 0; font-size: 3em; letter-spacing: 15px; color: #e74c3c; font-weight: bold; }
+        .actions button { padding: 20px 40px; font-size: 1.5em; margin: 10px; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s, opacity 0.3s; }
+        #btn-letter { background-color: #3498db; color: white; }
+        #btn-red-button { background-color: #c0392b; color: white; }
+        .actions button:disabled { background-color: #7f8c8d; cursor: not-allowed; opacity: 0.5; }
+        #answer-timer-display { font-size: 2.5em; color: #e67e22; margin-top: 15px; height: 40px; }
+        .message-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; font-size: 2.5em; z-index: 100; text-align: center;}
+        .feedback { font-size: 1.8em; margin-top: 20px; height: 50px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div id="player-name">Așteptare jucător...</div>
+            <div class="timer" id="main-timer">4:00</div>
+            <div class="score" id="player-score">0 lei</div>
+        </div>
+
+        <div class="definition" id="definition-text">Așteptare cuvânt...</div>
+        <div class="word-display" id="word-placeholder"></div>
+        <div class="feedback" id="feedback-message"></div>
+
+        <div id="answer-timer-display"></div>
+
+        <div class="actions" id="game-actions">
+            <button id="btn-letter" disabled>Cer o Literă</button>
+            <button id="btn-red-button" disabled>Butonul Roșu</button>
+        </div>
+    </div>
+    
+    <div class="message-overlay" id="message-overlay"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // Elementele DOM
+        const playerNameEl = document.getElementById('player-name');
+        const mainTimerEl = document.getElementById('main-timer');
+        const scoreEl = document.getElementById('player-score');
+        const definitionEl = document.getElementById('definition-text');
+        const wordEl = document.getElementById('word-placeholder');
+        const feedbackEl = document.getElementById('feedback-message');
+        const messageOverlay = document.getElementById('message-overlay');
+        const answerTimerDisplay = document.getElementById('answer-timer-display');
+        const btnLetter = document.getElementById('btn-letter');
+        const btnRedButton = document.getElementById('btn-red-button');
+
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = seconds % 60;
+            return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        // Listeneri pentru butoane
+        btnLetter.addEventListener('click', () => socket.emit('request_letter'));
+        btnRedButton.addEventListener('click', () => socket.emit('press_red_button'));
+
+        // --- Evenimente primite de la server ---
+        socket.on('update_jucator', (data) => {
+            playerNameEl.textContent = data.jucator_curent;
+            scoreEl.textContent = `${data.scor} lei`;
+            definitionEl.textContent = data.definitie;
+            wordEl.textContent = data.litere_afisate.join(' ');
+            
+            // Logica de blocare/deblocare butoane
+            const butoane = data.stare_butoane.jucator;
+            btnLetter.disabled = !butoane.cer_litera;
+            btnRedButton.disabled = !butoane.buton_rosu;
+
+            if (data.stare_butoane.prezentator.validare) {
+                feedbackEl.innerHTML = `<i>Așteptare validare răspuns...</i>`;
+            } else if (data.definitie) {
+                feedbackEl.innerHTML = `Valoare cuvânt: <b>${data.valoare_ramasa} lei</b>`;
+            } else {
+                 feedbackEl.innerHTML = "";
+            }
+        });
+
+        socket.on('update_timer', (data) => {
+            if (data.type === 'main') {
+                mainTimerEl.textContent = formatTime(data.time);
+                answerTimerDisplay.textContent = '';
+            } else if (data.type === 'answer') {
+                answerTimerDisplay.textContent = `Timp Răspuns: ${data.time}`;
+            }
+        });
+
+        socket.on('show_message', (message) => {
+            messageOverlay.innerHTML = message;
+            messageOverlay.style.display = 'flex';
+            setTimeout(() => {
+                messageOverlay.style.display = 'none';
+            }, 4000);
+        });
+
+        socket.on('show_feedback', (data) => {
+            answerTimerDisplay.textContent = '';
+            if (data.corect) {
+                feedbackEl.innerHTML = `<span style="color: #2ecc71;">CORECT! Cuvântul a fost: ${data.cuvant}</span>`;
+            } else {
+                feedbackEl.innerHTML = `<span style="color: #e74c3c;">${data.mesaj} Cuvântul corect era: ${data.cuvant}</span>`;
+            }
+        });
+
+        socket.on('game_over', (data) => {
+            document.querySelector('.container').innerHTML = '<h1>Joc Terminat!</h1>';
+            const scoresContainer = document.createElement('div');
+            let scoresHtml = '<h2>Clasament Final</h2><ul style="list-style:none; padding:0; font-size:1.5em;">';
+            const sortedScores = Object.entries(data.scoruri).sort(([,a],[,b]) => b-a);
+            for (const [player, score] of sortedScores) {
+                scoresHtml += `<li>${player}: ${score} lei</li>`;
+            }
+            scoresHtml += '</ul>';
+            scoresContainer.innerHTML = scoresHtml;
+            document.querySelector('.container').appendChild(scoresContainer);
+        });
+    </script>
+</body>
+</html>
